@@ -1,0 +1,242 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+<script>
+
+
+  // set the dimensions and margins of the graph
+  var margin = {top: 10, right: 30, bottom: 30, left: 60},
+      width = 460 - margin.left - margin.right,
+      height = 400 - margin.top - margin.bottom;
+  
+  // append the svg object to the body of the page
+  var svg = d3.select("#my_dataviz")
+    .append("svg")
+      .attr("width", width + margin.left + margin.right*2.5)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+  
+  //Read the data
+  d3.csv("final_stock.csv",
+     // When reading the csv, I must format variables:
+    function(d){
+      return { stockName : d.StockName, Date : d3.timeParse("%Y-%m-%d")(d.Date),Open : d.Open ,High : d.High,Low : d.Low,Close : d.Close,AdjClose : d.AdjClose,Volume : d.Volume}
+    },
+    function(data){
+
+    //Seperating into sections our data based on how many stocks we have
+    var sections = {};
+    data.forEach(function(d) {
+        // Assuming 'entry' is the column you want to use to divide the data
+        var entry = d3.values(d)[0];
+        if (!sections[entry]) {
+            sections[entry] = [];
+        }
+        sections[entry].push(d);
+    });
+
+    console.log(sections)
+
+    var varMax = 0
+    for (var entry in sections) {
+        if (sections.hasOwnProperty(entry)) {
+            var sectionData = sections[entry];
+            // Find max Close in sectionData
+            var maxClose = d3.max(sectionData, function(d) {
+                // Assuming 'Close' is the attribute you want to find the maximum of
+                return +d.Close; // Convert to number
+            });
+            //console.log("Max Close in section for entry " + entry + ":", maxClose);
+            varMax += maxClose
+        }
+    }
+    console.log(sections)
+
+    // group the data: one array for each value of the X axis.
+    var sumstat = d3.nest()
+      .key(function(d) { return d.Date; })
+      .entries(data)
+  
+    
+    var count = 0
+    var etf = []
+    var etfs = []
+    for (var entry in sections) {
+      etf.push(count)
+      
+
+      etfs.push(entry)
+      count++
+    }
+    console.log(etfs)
+    console.log(etf)
+
+    // Stack the data: each group will be represented on top of each other
+    var stackedData = d3.stack()
+      .keys(etf)
+      .value(function(d, key){
+        if (typeof d.values[key] !== 'undefined') {
+            return d.values[key].Close;
+            
+        } else {
+            
+            console.log("FOUND UNDEFINED")
+            return 1; // or any default value you prefer
+        }
+      })
+      (sumstat)
+
+      //console.log(stackedData)
+
+    // Add X axis --> it is a date format
+    var x = d3.scaleTime()
+      .domain(d3.extent(data, function(d) { 
+        return (d.Date); }))
+      .range([ 0, width ]);
+    svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x).ticks(5));
+  
+    // Add Y axis
+    var y = d3.scaleLinear()
+      .domain([0, varMax])
+      .range([ height, 0 ]);
+    svg.append("g")
+      .call(d3.axisLeft(y));
+  
+    // color palette
+    var color = d3.scaleOrdinal()
+      .domain(etfs)
+      .range(['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'])
+    
+    // Initialize an array to store the maximum values for each element
+    var maxValues = [];
+
+    // Loop through each element
+    stackedData.forEach(function(element) {
+        // Calculate the maximum value of the second attribute for the current element
+        var maxSecondAttribute = d3.max(element, function(d) { return d.Close; });
+        // Store the maximum value in the maxValues array
+        maxValues.push(maxSecondAttribute);
+    });
+
+   // Show the areas
+    svg
+      .selectAll("mylayers")
+      .data(stackedData)
+      .enter()
+      .append("path")
+        .attr("class", function(d) { return "area" }) // Assign a class based on the ETF
+        .style("fill", function(d) { return color(etfs[d.key]); }) // Set fill color based on the ETF
+        .attr("d", d3.area()
+          .x(function(d, i) { return x(new Date(d.data.key)); })
+          .y0(function(d) { return y(d[0]); })
+          .y1(function(d) { return y(d[1]); })
+      )
+            // Add mouseover and mouseout events to the areas
+      .on("mouseover", function(d) {
+          // Highlight the current area (increase opacity)
+           d3.select(this).style("opacity", 0.8);
+          // Highlight the corresponding legend item
+          d3.select(".legend-item-" + etfs[d.key]).style("opacity", .7);
+      })
+      .on("mouseout", function(d) {
+          // Restore the opacity when mouse leaves the area
+          d3.select(this).style("opacity", 1);
+          // Remove highlight from the corresponding legend item
+          d3.select(".legend-item-" + etfs[d.key]).style("opacity", 1);
+
+      })
+      // Add click event to areas
+      .on("click", function(d) {
+          var areaClass = ".area-" + etfs[d.key];
+          var thisArea = this;
+          // Toggle highlight on click for the clicked area
+          //d3.select(this).style("opacity", 1)
+          // Toggle highlight on the corresponding legend item
+          // Toggle opacity for all other areas except the clicked one
+          d3.selectAll(".area")
+              .filter(function() { return this !== thisArea; })
+              .style("opacity", .3); // Set opacity to 1 for all areas except the clicked one
+              d3.selectAll(".legend-item")
+                .style("opacity", .3); 
+              d3.selectAll(".legend-item-" + etfs[d.key])
+                .style("opacity", 1); 
+
+  });
+   
+    // Create a legend container
+    var legend = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", "translate(" + (width+10) + ", 20)");
+
+    // Add legend items
+    var legendItems = legend.selectAll(".legend")
+        .data(stackedData)
+        .enter().append("g")
+        .attr("class", function(d) { return "legend-item legend-item-" + etfs[d.key]; }) // Assign a class based on the ETF
+        .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+    // Add colored rectangles (representing series) to legend
+    legendItems.append("rect")
+        .attr("x", 0)
+        .attr("width", 10)
+        .attr("height", 10)
+        .attr("fill", function(d) { name = etfs[d.key] ;  return color(name); }) // Assuming 'color' is your color scale
+
+    // Add text labels to legend
+    // Add text labels to legend
+    legendItems.append("text") // Add text within each rectangle
+        .attr("x", 20)
+        .attr("y", 5)
+        .attr("dy", ".35em")
+        .text(function(d) { return d[0].data.values[d.key].stockName; }); // Use the stock name of the first data point in each series
+    
+    // Add hover and click events to legend items
+    legendItems.on("mouseover", function(d) {
+          // Highlight corresponding area in the chart (e.g., increase opacity)
+          d3.selectAll(".area-" + etfs[d.key])
+              .style("opacity", 0.8);
+      })
+      .on("mouseout", function(d) {
+          // Remove highlight when mouse leaves legend item
+          d3.selectAll(".area-" + etfs[d.key])
+              .style("opacity", 1);
+      });  
+
+    // Add x-axis label
+    svg.append("text")
+        .attr("class", "x label")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", height + margin.bottom)
+        .text("Time");
+
+    // Add y-axis label
+    svg.append("text")
+        .attr("class", "y label")
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -margin.left/2)
+        .text("Total Value ($)");
+    //-90, -30
+    // Add chart title
+    svg.append("text")
+        .attr("class", "title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", margin.top / 2)
+        .text("Portfolio Performance");
+
+  })
+  </script>

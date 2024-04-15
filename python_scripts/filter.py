@@ -32,7 +32,7 @@ def filter_csv(input_file, output_file, column_index):
             # Write rows where the value appears at least three times
             for row in reader:
                 value = row[column_index]
-                if value_counts[value] >= 3:
+                if value_counts[value] >= 6:
                     writer.writerow(row)
 
 # Example usage
