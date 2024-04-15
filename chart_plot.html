@@ -1,0 +1,23 @@
+!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+<script>
+
+data = File("final_stocks.csv").csv({typed: true})
+
+Plot.plot({
+    marginLeft: 60,
+    y: {grid: true},
+    color: {legend: true, columns: 6},
+    marks: [
+      Plot.areaY(data, {x: "Date", y: "Close", fill: "StockName"}),
+      Plot.ruleY([0])
+    ]
+  })
+</script>
