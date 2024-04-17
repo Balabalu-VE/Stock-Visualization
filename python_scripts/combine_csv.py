@@ -1,52 +1,34 @@
 import csv
 import os
+import random
 
-def merge_csv_files(input_folder_etf, input_folder_stocks, output_file):
-    # List all CSV files in the input folder
-    csv_files_etf = [f for f in os.listdir(input_folder_etf) if f.endswith('.csv')]
-    csv_files_stocks = [f for f in os.listdir(input_folder_stocks) if f.endswith('.csv')]
-
-    # Open the output file in write mode
+def merge_csv_files(input_folders, output_file):
     with open(output_file, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
-        
-        # Write the header row
-        writer.writerow(['StockType', 'StockName', 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume'])
-        
-        # Iterate over each CSV file in the input folder for ETFs
-        for csv_file in csv_files_etf:
-            with open(os.path.join(input_folder_etf, csv_file), 'r', newline='') as infile:
-                reader = csv.reader(infile)
-                
-                # Skip header
-                next(reader)
+        writer.writerow(['StockType', 'StockName', 'Date', 'Close', 'Holdings'])  # Including the new 'Holdings' column
 
-                # Write rows from the current CSV file to the output file
-                for row in reader:
-                    # Insert filename without extension as the first column
-                    row.insert(0, "ETF")
+        for folder_type, folder_path in input_folders.items():
+            csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
+            for csv_file in csv_files:
+                with open(os.path.join(folder_path, csv_file), 'r', newline='') as infile:
+                    reader = csv.reader(infile)
+                    next(reader)  # Skip header
                     filename_without_extension = os.path.splitext(csv_file)[0]
-                    row.insert(1, filename_without_extension)
-                    writer.writerow(row)
-         # Iterate over each CSV file in the input folder for stocks
-        for csv_file in csv_files_stocks:
-            with open(os.path.join(input_folder_stocks, csv_file), 'r', newline='') as infile:
-                reader = csv.reader(infile)
-                
-                # Skip header
-                next(reader)
 
-                # Write rows from the current CSV file to the output file
-                for row in reader:
-                    # Insert filename without extension as the first column
-                    row.insert(0, "Stock")
-                    filename_without_extension = os.path.splitext(csv_file)[0]
-                    row.insert(1, filename_without_extension)
-                    writer.writerow(row)
-    
+                    # Generate a random number between 0 and 10 for each unique StockName
+                    random_holdings = {filename_without_extension: random.uniform(0, 10)}
 
-input_folder_etf = 'Stocks/ETF'
-input_folder_stocks = 'Stocks/Stock'
+                    for row in reader:
+                        # Selecting columns StockType, StockName, Date, and Close
+                        stock_name = filename_without_extension
+                        holdings = random_holdings.get(stock_name, random.uniform(0, 10))
+                        selected_row = [folder_type, stock_name, row[0], row[4], holdings]
+                        writer.writerow(selected_row)
+
+input_folders = {
+    'ETF': 'Stocks/ETF',
+    'Stock': 'Stocks/Stock'
+}
 output_file = 'output.csv'
 
-merge_csv_files(input_folder_etf, input_folder_stocks, output_file)
+merge_csv_files(input_folders, output_file)
