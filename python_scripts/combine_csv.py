@@ -5,7 +5,7 @@ import random
 def merge_csv_files(input_folders, output_file):
     with open(output_file, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
-        writer.writerow(['StockType', 'StockName', 'Date', 'Close', 'Holdings'])  # Including the new 'Holdings' column
+        writer.writerow(['StockType', 'StockName', 'Date', 'Close', 'Holdings', "Value"]) 
 
         for folder_type, folder_path in input_folders.items():
             csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
@@ -19,10 +19,11 @@ def merge_csv_files(input_folders, output_file):
                     random_holdings = {filename_without_extension: random.uniform(0, 10)}
 
                     for row in reader:
-                        # Selecting columns StockType, StockName, Date, and Close
+                        # Selecting columns StockType, StockName, Date, Close, and Value
                         stock_name = filename_without_extension
                         holdings = random_holdings.get(stock_name, random.uniform(0, 10))
-                        selected_row = [folder_type, stock_name, row[0], row[4], holdings]
+                        value = float(row[4]) * holdings
+                        selected_row = [folder_type, stock_name, row[0], row[4], holdings, value]
                         writer.writerow(selected_row)
 
 input_folders = {
