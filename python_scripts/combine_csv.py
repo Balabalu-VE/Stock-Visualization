@@ -22,7 +22,7 @@ def merge_csv_files(input_folders, output_file):
                         # Selecting columns StockType, StockName, Date, Close, and Value
                         stock_name = filename_without_extension
                         holdings = random_holdings.get(stock_name, random.uniform(0, 10))
-                        value = float(row[4]) * holdings
+                        value = float(row[4]) * holdings 
                         selected_row = [folder_type, stock_name, row[0], row[4], holdings, value]
                         writer.writerow(selected_row)
 
