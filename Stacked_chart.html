@@ -293,6 +293,7 @@
     }
 
     var stackedData = calculateStackedData(data, etf, "value")
+    var totalNumberOfStocks = stackedData.length
 
     // Add X axis --> it is a date format
     var x = d3.scaleTime()
@@ -327,12 +328,13 @@
 // Append a group element to hold the area paths and apply clipping
 var areaGroup = svg.append("g")
     .attr("clip-path", "url(#clip)");
-
+var colorScale = d3.scaleLinear()
+      .domain([-1, 0, 1]) // Define the domain from -1 (red) to 0 (white) to 1 (green)
+      .range(["#FF0000", "#FFFFFF", "#00FF00"]); // Define the corresponding colors
 
    // Show the areas
     function showAreas(stackedData, y, x){
       //svg.remove()
-        console.log("BBBBBBBBBBB")
         svg
         .selectAll("area")
         .data(stackedData.reverse())
@@ -341,23 +343,13 @@ var areaGroup = svg.append("g")
           .attr("class", function(d) { return "area area-" + etfs[d.key] }) // Assign a class based on the ETF
           .attr("clip-path", "url(#clip)") // Apply clipping to the areas
           .style("fill", function(d) {  
-            columnSelected = getRadioButtonColor()
-            console.log(columnSelected)
-            if(columnSelected == "PercentChange"){
-              console.log("AAAAAAAAAAAAAa")
-              if (parseFloat(d[d.length - 1].data.values[d.key].percent - 100/stackedData.length) > 0)
-              {
-                return "#00FF00"
-              }
-              else{
-                return '#FF0000'
-              }
-            }
-            else{
-              return color(etfs[d.key]);
-            }
-            
-          
+              columnSelected = getRadioButtonColor();
+              if (columnSelected == "PercentChange") {
+                  var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
+                  return colorScale(percentDiff);
+              } else {
+                  return color(etfs[d.key]);
+              }          
            }) // Set fill color based on the ETF
           .attr("d", d3.area()
             .x(function(d) { return x(new Date(d.data.key)); })
@@ -371,7 +363,7 @@ var areaGroup = svg.append("g")
             if (!isHighlighted){
               d3.select(this).style("opacity", 0.8);
               // Highlight the corresponding legend item
-              console.log("Over area with key: " + d.key)
+              //console.log("Over area with key: " + d.key)
               d3.select(".legend-item-" + etfs[d.key]).style("opacity", .7);
             }
         })
@@ -396,8 +388,7 @@ var areaGroup = svg.append("g")
                   .style("opacity", 1); 
             d3.select(this).style("opacity", 1);
             const popup = document.getElementById("popup");
-
-            popup.innerHTML = `Latest value of <strong>${d[d.length - 1].data.values[d.key].stockName}</strong> ${d[d.length - 1].data.values[d.key].stockType}: <strong>$${parseFloat(d[d.length - 1].data.values[d.key].value).toFixed(2)} </strong> <br> Total change in percentage: <strong>${parseFloat(d[d.length - 1].data.values[d.key].percent - 100/stackedData.length).toFixed(2) }% </strong> <br> Share of portfolio: <strong>${parseFloat((d[d.length - 1].data.values[d.key].value / latestTotal) * 100).toFixed(2) }% </strong>`;
+            popup.innerHTML = `Latest value of <strong>${d[d.length - 1].data.values[d.key].stockName}</strong> ${d[d.length - 1].data.values[d.key].stockType}: <strong>$${parseFloat(d[d.length - 1].data.values[d.key].value).toFixed(2)} </strong> <br> Total change in percentage: <strong>${parseFloat(d[d.length - 1].data.values[d.key].percent - 100/totalNumberOfStocks).toFixed(2) }% </strong> <br> Share of portfolio: <strong>${parseFloat((d[d.length - 1].data.values[d.key].value / latestTotal) * 100).toFixed(2) }% </strong>`;
             
             popup.style.left = (d3.event.pageX + 10) + "px";
             popup.style.top = (d3.event.pageY + 10) + "px";
@@ -611,9 +602,7 @@ var areaGroup = svg.append("g")
           .transition()
           .call(d3.axisLeft(y));  
           // Define the color scale
-      var colorScale = d3.scaleLinear()
-          .domain([-1, 0, 1]) // Define the domain from -1 (red) to 0 (white) to 1 (green)
-          .range(["#FF0000", "#FFFFFF", "#00FF00"]); // Define the corresponding colors
+      
  
       if (changingXDomain == true){
         // Update areas with filtered and stacked data
@@ -628,18 +617,16 @@ var areaGroup = svg.append("g")
             )
             .style("fill", function(d) {  
               columnSelected = getRadioButtonColor();
-              console.log(columnSelected);
               if (columnSelected == "PercentChange") {
-                  var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / stackedData.length)/6);
+                  var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
                   return colorScale(percentDiff);
               } else {
                   return color(etfs[d.key]);
               }
           })
           .style("opacity", function(d) {
-              var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / stackedData.length)/6);
+              var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
               // Adjust opacity based on the percent difference
-              console.log(Math.abs(percentDiff))
               return Math.abs(percentDiff) / 2 + 0.5; // Opacity ranges from 0.5 to 1
           });
       }
