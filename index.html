@@ -1,0 +1,736 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://unpkg.com/d3-simple-slider"></script>
+
+<div class="container">
+    <!-- Create a div for the graph -->
+    <div id="my_dataviz" class="graph-container"></div>
+    <!-- Create a div for the filters -->
+    <div class="filters">
+        <!-- Create a div for the filter -->
+        <div id="filterContainer">
+            <!-- Add title for the filter -->
+            <div class="filterTitle">Filter by type:</div>
+            <!-- Create a div for the checkbox container -->
+            <div id="checkboxContainer"></div>
+        </div>
+        <!-- Create a div for the second filter -->
+        <div id="typeContainer">
+            <!-- Add title for the second filter -->
+          <div class="filterTitle">Show chart based on:</div>
+            <!-- Create a div for the checkbox container of the second filter -->
+           <!-- Create radio buttons for type selection -->
+          <div id="radioButtonContainer">
+            <div>
+                <label><input type="radio" class="type-filter-radio" name="type" value="Percentage"> Percentage</label>
+            </div>
+            <div>
+                <label><input type="radio" class="type-filter-radio" name="type" value="Total Value" checked> Total Value </label>
+            </div>
+          </div>
+        </div>
+        <div id="typeContainer">
+          <!-- Add title for the second filter -->
+        <div class="filterTitle">Show chart color as:</div>
+          <!-- Create a div for the checkbox container of the second filter -->
+         <!-- Create radio buttons for type selection -->
+        <div id="radioButtonContainer">
+          <div>
+              <label><input type="radio" class="color-type-filter-radio" name="type-color" value="Stock" checked> Stock </label>
+          </div>
+          <div>
+              <label><input type="radio" class="color-type-filter-radio" name="type-color" value="PercentChange"> Percentage change </label>
+          </div>
+        </div>
+      </div>
+      <div id="dateContainer">
+        <div class="filterTitle">Select date range:</div>
+        <div id="slider-range"></div>
+      </div>
+
+        <button class="button" id="shareButton" > Share</button >
+        <!-- Add a div for the slider -->
+        
+    </div>
+    <div id="popup" class="popup"></div>
+</div>
+
+<style>
+    .popup {
+        position: absolute;
+        background-color: white;
+        border: 1px solid #ccc;
+        padding: 10px;
+        display: none;
+    }
+    .graph-container {
+        max-width: 100%; /* Set the maximum width */
+        overflow: hidden; /* Hide content that overflows the container */
+    }
+
+    /* CSS styling for the parent container */
+    .container {
+        display: flex;
+        justify-content: flex-start; /* Align items at the start of the flex container */
+    }
+
+    /* CSS styling for the graph */
+    #my_dataviz {
+        margin-right: 10px; /* Add margin to separate from filters */
+    }
+
+    /* CSS styling for the filters container */
+    .filters {
+        flex-direction: column; /* Stack filters vertically */
+        position: relative;
+    }
+
+    /* CSS styling for filter containers */
+    #filterContainer, #typeContainer {
+        width: 150px; /* Set width to control position */
+        margin-left: 10px; /* Add margin for spacing */
+        border: 2px solid lightblue; /* Add light blue border */
+        background-color: rgba(173, 216, 230, 0.3); /* Light blue background with low opacity */
+        padding: 10px; /* Add padding for spacing */
+        max-height: 60px; /* Limit the maximum height */
+        overflow-y: auto; /* Add vertical scrollbar if content overflows */
+    }
+    /* CSS styling for filter containers */
+    #dateContainer {
+        width: 150px; /* Set width to control position */
+        margin-left: 10px; /* Add margin for spacing */
+        border: 2px solid lightblue; /* Add light blue border */
+        background-color: rgba(173, 216, 230, 0.3); /* Light blue background with low opacity */
+        padding: 10px; /* Add padding for spacing */
+        max-height: 60px; /* Limit the maximum height */
+    }
+
+    /* CSS styling for filter title */
+    .filterTitle {
+        font-weight: bold; /* Make title bold */
+    }
+    .button{
+        height:30px;
+        width:60px;
+        position: absolute;
+        bottom: 0;
+}
+</style>
+
+
+<script>
+
+  var isHighlighted = false;
+
+  // set the dimensions and margins of the graph
+  var margin = {top: 10, right: 30, bottom: 30, left: 60},
+      width = 460 - margin.left - margin.right,
+      height = 400 - margin.top - margin.bottom;
+  
+  // append the svg object to the body of the page
+  var svg = d3.select("#my_dataviz")
+    .append("svg")
+      .attr("width", width + margin.left + margin.right*2.7)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+  
+  //Read the data
+  d3.csv("final_stock_percent_change.csv",
+     // When reading the csv, I must format variables:
+    function(d){
+      return { stockType: d.StockType, stockName : d.StockName, Date : d3.timeParse("%Y-%m-%d")(d.Date), Close : d.Close, holdings : d.Holdings, value : d.Value, percent : d.PercentChange}
+    },
+    function(data){
+
+    defaultRange = [d3.min(data, d => d.Date), d3.max(data, d => d.Date)]
+
+    //Seperating into sections our data based on how many stocks we have
+    var sections = {};
+    data.forEach(function(d) {
+        // Assuming 'entry' is the column you want to use to divide the data
+        var entry = d3.values(d)[1];
+        if (!sections[entry]) {
+            sections[entry] = [];
+        }
+        sections[entry].push(d);
+    });
+    function getRadioButton(){
+      var checkedRadioButtonValue = null;
+      var radioButtons = d3.selectAll(".type-filter-radio");
+      // Loop through each radio button
+      radioButtons.each(function() {
+        // Check if the radio button is checked
+        if (this.checked) {
+            // If checked, set its value (the type) to the variable
+            checkedRadioButtonValue = this.value;
+        }
+      });
+      if (checkedRadioButtonValue === "Percentage"){
+        columnSelected = "percent"
+        svg.select(".y-axis").text("Percentage (%)")
+      }
+      else{
+        svg.select(".y-axis").text("Total Value ($)")
+        columnSelected = "value"
+      }
+      return columnSelected
+    }
+    function getRadioButtonColor(){
+      var checkedRadioButtonValue = null;
+      var radioButtons = d3.selectAll(".color-type-filter-radio");
+      // Loop through each radio button
+      radioButtons.each(function() {
+        // Check if the radio button is checked
+        if (this.checked) {
+            // If checked, set its value (the type) to the variable
+            checkedRadioButtonValue = this.value;
+        }
+      });
+      if (checkedRadioButtonValue === "PercentChange"){
+        columnSelected = "PercentChange"
+      }
+      else{
+        columnSelected = "Stock"
+      }
+      return columnSelected
+    }
+    var varMax = 0
+    function calculateVarMax(filter, column){
+      var varMaxTemp = 0
+      for (var entry in filter) {
+        if (filter.hasOwnProperty(entry)) {
+            var sectionData = filter[entry];
+            // Find max Close in sectionData
+            var maxValue = d3.max(sectionData, function(d) {
+               if (column === "percent"){
+                return +d.percent
+               }else{
+                return +d.value; // Convert to number
+               }
+            });
+            //console.log("Max Close in section for entry " + entry + ":", maxValue);
+            varMaxTemp += maxValue
+        } 
+      }
+      return varMaxTemp
+    }
+    
+    varMax = calculateVarMax(sections, null)
+
+    function calculateLatestTotal(filter){
+      var varMaxTemp = 0
+      for (var entry in filter) {
+        if (filter.hasOwnProperty(entry)) {
+            var sectionData = filter[entry];
+            // Find max Close in sectionData
+            var lastData = sectionData[sectionData.length - 1].value;
+            //console.log("Max Close in section for entry " + entry + ":", maxValue);
+            varMaxTemp += parseFloat(lastData)
+        } 
+      }
+      return varMaxTemp
+    }
+
+    latestTotal = calculateLatestTotal(sections)
+
+    // group the data: one array for each value of the X axis.
+    var sumstat = d3.nest()
+      .key(function(d) { return d.Date; })
+      .entries(data)
+      
+      function hasDuplicateKeys(obj) {
+          const keys = Object.keys(obj);
+          const keyCount = {};
+
+          // Count occurrences of each key
+          keys.forEach(key => {
+              keyCount[key] = (keyCount[key] || 0) + 1;
+          });
+
+          // Check if any key occurs more than once
+          return keys.some(key => keyCount[key] > 1);
+      }
+
+    
+// console.log(hasDuplicateKeys(sumstat)); // Output: false
+// console.log(hasDuplicateKeys(dictionary2)); // Output: true
+    
+    var count = 0
+    var etf = []
+    var etfs = []
+    for (var entry in sections) {
+      etf.push(count)
+      etfs.push(entry)
+      count++
+    }
+
+    function calculateStackedData(filteredData, filteredETF, column) {
+        return d3.stack()
+            .keys(filteredETF)
+            .value(function(d, key) {
+                if (d.values !== undefined && d.values[key] !== undefined) {
+                    if (column === "value")
+                    {
+                      return +d.values[key].value;
+                    } else if (column === "percent"){
+                      return +d.values[key].percent;
+                    }else{
+                      return +d.values[key].value
+                    }
+                    
+                } else {
+                    //console.log("FOUND UNDEFINED");
+                    return 0; // or any default value you prefer
+                }
+            })
+            (sumstat);
+    }
+
+    var stackedData = calculateStackedData(data, etf, "value")
+    var totalNumberOfStocks = stackedData.length
+
+    // Add X axis --> it is a date format
+    var x = d3.scaleTime()
+      .domain(d3.extent(data, function(d) { 
+        return (d.Date); }))
+      .range([ 0, width ]);
+    svg.append("g")
+      .attr("class", "x-axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x)
+            .ticks(4.2)
+            .tickFormat(d3.timeFormat("%m-%Y")));
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+      .domain([0, varMax])
+      .range([ height, 0 ]);
+    svg.append("g")
+      .call(d3.axisLeft(y));
+  
+    // color palette
+    var color = d3.scaleOrdinal()
+      .domain(etfs)
+      .range(['#984ea3','#ff7f00','#999999', '#3B7DED', '#BD1A2E','#FF0197','#a65628','#f781bf','#999999'])
+    
+  svg.append("defs").append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height);
+
+// Append a group element to hold the area paths and apply clipping
+var areaGroup = svg.append("g")
+    .attr("clip-path", "url(#clip)");
+var colorScale = d3.scaleLinear()
+      .domain([-1, 0, 1]) // Define the domain from -1 (red) to 0 (white) to 1 (green)
+      .range(["#FF0000", "#FFFFFF", "#00FF00"]); // Define the corresponding colors
+
+   // Show the areas
+    function showAreas(stackedData, y, x){
+      //svg.remove()
+        svg
+        .selectAll("area")
+        .data(stackedData.reverse())
+        .enter() 
+        .append("path")
+          .attr("class", function(d) { return "area area-" + etfs[d.key] }) // Assign a class based on the ETF
+          .attr("clip-path", "url(#clip)") // Apply clipping to the areas
+          .style("fill", function(d) {  
+              columnSelected = getRadioButtonColor();
+              if (columnSelected == "PercentChange") {
+                  var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
+                  return colorScale(percentDiff);
+              } else {
+                  return color(etfs[d.key]);
+              }          
+           }) // Set fill color based on the ETF
+          .attr("d", d3.area()
+            .x(function(d) { return x(new Date(d.data.key)); })
+            .y0(function(d) { return  y(d[0]); })
+            .y1(function(d) { return y(d[1]); })
+        )
+        
+              // Add mouseover and mouseout events to the areas
+        .on("mouseover", function(d) {
+            // Highlight the current area (increase opacity)
+            if (!isHighlighted){
+              d3.select(this).style("opacity", 0.8);
+              // Highlight the corresponding legend item
+              //console.log("Over area with key: " + d.key)
+              d3.select(".legend-item-" + etfs[d.key]).style("opacity", .7);
+            }
+        })
+        .on("mouseout", function(d) {
+          if (!isHighlighted){
+            // Restore the opacity when mouse leaves the area
+            d3.select(this).style("opacity", 1);
+            // Remove highlight from the corresponding legend item
+            d3.select(".legend-item-" + etfs[d.key]).style("opacity", 1);
+          }
+        })
+        // Add click event to areas
+        .on("click", function(d) {
+            var thisArea = this;
+            isHighlighted = true
+            d3.selectAll(".area")
+                .filter(function() { return this !== thisArea; })
+                .style("opacity", .3); // Set opacity to 1 for all areas except the clicked one
+                d3.selectAll(".legend-item")
+                  .style("opacity", .3); 
+                d3.selectAll(".legend-item-" + etfs[d.key])
+                  .style("opacity", 1); 
+            d3.select(this).style("opacity", 1);
+            const popup = document.getElementById("popup");
+            popup.innerHTML = `Latest value of <strong>${d[d.length - 1].data.values[d.key].stockName}</strong> ${d[d.length - 1].data.values[d.key].stockType}: <strong>$${parseFloat(d[d.length - 1].data.values[d.key].value).toFixed(2)} </strong> <br> Total change in percentage: <strong>${parseFloat(d[d.length - 1].data.values[d.key].percent - 100/totalNumberOfStocks).toFixed(2) }% </strong> <br> Share of portfolio: <strong>${parseFloat((d[d.length - 1].data.values[d.key].value / latestTotal) * 100).toFixed(2) }% </strong>`;
+            
+            popup.style.left = (d3.event.pageX + 10) + "px";
+            popup.style.top = (d3.event.pageY + 10) + "px";
+            popup.style.display = "block"
+        
+        })
+        .style("opacity", 0) // Set initial opacity to 0 for the enter selection
+        .transition() // Apply transition to smoothly reveal the areas
+        .delay(function(d, i) { return i * 100; }) // Add delay to stagger the animation
+        .duration(500) // Set the duration of the transition
+        .style("opacity", 1); // Transition opacity to 1 to reveal the area
+
+       
+    
+      
+    }
+    showAreas(stackedData, y, x)
+
+
+    // Add legend items
+    function addLegends(stackedData){
+      // Create a legend container
+      var legend = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", "translate(" + (width+10) + ", 20)");
+      var legendItems = legend.selectAll(".legend")
+          .data(stackedData)
+          .enter().append("g")
+          .attr("class", function(d) { 
+            if(etfs[d.key] !== undefined){
+              return "legend-item legend-item-" + etfs[d.key]; // Assign a class based on the ETF
+            }
+          })
+          .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+       
+      // Add colored rectangles (representing series) to legend
+      legendItems.append("rect")
+          .attr("x", 0)
+          .attr("width", 10)
+          .attr("height", 10)
+          .attr("fill", function(d) { name = etfs[d.key] ; 
+            if(etfs[d.key] !== undefined){ 
+              return color(name)
+            }else {
+              return "#FFFFFF" //Turn boxes to white (to make them dissapear if not in filter)
+            }; 
+          
+          }) // Assuming 'color' is your color scale
+
+      // Add text labels to legend
+      legendItems.append("text") // Add text within each rectangle
+          .attr("x", 20)
+          .attr("y", 5)
+          .attr("dy", ".35em")
+          .text(function(d) {
+            if (d[d.length - 1].data.values[d.key] !== undefined) {
+              return d[d.length - 1].data.values[d.key].stockName;
+            } else {
+              return null
+            }
+            
+          }); // Use the stock name of the first data point in each series
+      
+      // Add hover and click events to legend items
+      legendItems.on("mouseover", function(d) {
+        if (!isHighlighted){
+            // Highlight corresponding area in the chart (e.g., increase opacity)
+            d3.select(".area-" + etfs[d.key]).style("opacity", 0.8);
+            // console.log("Over area: " + etfs[d.key])
+        }
+        })
+        .on("mouseout", function(d) {
+          if (!isHighlighted){
+            // Remove highlight when mouse leaves legend item
+            d3.select(".area-" + etfs[d.key]).style("opacity", 1);
+          }
+        });  
+    }
+    addLegends(stackedData)
+
+    // Add x-axis label
+    svg.append("text")
+        .attr("class", "x-axis")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", height + margin.bottom)
+        .text("Time");
+
+    // Add y-axis label
+    svg.append("text")
+        .attr("class", "y-axis")
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -margin.left/2 - 10)
+        .text("Total Value ($)");
+    //-90, -30
+    // Add chart title
+    svg.append("text")
+        .attr("class", "title")
+        .attr("text-anchor", "middle")
+        .attr("x", width / 2)
+        .attr("y", margin.top / 2)
+        .attr("font-weight", "bold")
+        .text("Portfolio Performance");
+
+   // Extract unique stock types
+    var uniqueStockTypes = Array.from(new Set(stackedData.map(function(d) {
+        return d[d.length - 1].data.values[d.key].stockType;
+    })));
+
+    // Function to update the visualization based on selected stock types
+    function updateVisualization(x_domain = defaultRange, changingXDomain = false) {
+        
+
+         // Variable to store the value of the checked radio button
+        columnSelected = getRadioButton()
+        
+
+
+        // Get an array of selected stock types
+        var selectedStockTypes = [];
+        d3.selectAll(".stock-filter-checkbox").each(function() {
+            if (this.checked) {
+                selectedStockTypes.push(this.value);
+            }
+        });
+
+        var filteredData = null
+        if (selectedStockTypes.length !== 0){
+            // Filter data based on selected stock types
+            filteredData = data.filter(function(d) {
+            return selectedStockTypes.includes(d.stockType);
+        });
+        }else{
+          filteredData = data
+        }
+      
+        // Filter data based on slider values
+        filteredData = filteredData.filter(d => d.Date >= x_domain[0] && d.Date <= x_domain[1]);
+       
+        //Seperating into sections our data based on how many stocks we have
+        var filteredSections = {};
+        filteredData.forEach(function(d) {
+            // Assuming 'entry' is the column you want to use to divide the data
+            var entry = d3.values(d)[1];
+            if (!filteredSections[entry]) {
+              filteredSections[entry] = [];
+            }
+            filteredSections[entry].push(d);
+        });
+        var filteredETF = []
+        var filteredETFS = []
+        count = 0
+        if (selectedStockTypes.length !== 0){
+        for (var entry in sections) {
+          if(Object.keys(filteredSections).includes(entry)){
+            filteredETF.push(count)
+            filteredETFS.push(entry)
+          }
+          count++
+        }
+        }else {
+          for (var entry in sections) {
+            if(Object.keys(sections).includes(entry)){
+              filteredETF.push(count)
+              filteredETFS.push(entry)
+            }
+            count++
+          }
+        }
+        // Update the x-axis with new domain
+        svg.select(".x-axis")
+          .transition()
+          .duration(300) // transition duration in ms
+          .call(d3.axisBottom(x)
+              .ticks(4.2)
+              .tickFormat(d3.timeFormat("%m-%Y")));
+
+
+         // Recalculate any necessary variables or scales based on the filtered data
+        var filteredStackedData = calculateStackedData(filteredData, filteredETF, columnSelected);
+        // Update areas with filtered and stacked data
+        svg.selectAll(".area")
+            .data(filteredStackedData)
+            .transition()
+            .remove();
+
+        filteredVarMax = calculateVarMax(sections, columnSelected);
+        
+        //Remove x and y axis
+        svg.selectAll("g").remove();
+
+      // Add X axis --> it is a date format
+      x = d3.scaleTime()
+          .domain(d3.extent(filteredData, function(d) { 
+            return (d.Date); }))
+          .range([ 0, width ]);
+        svg.append("g")
+          .attr("class", "x-axis")
+          .attr("transform", "translate(0," + height + ")")
+          .call(d3.axisBottom(x)
+            .ticks(4.2)
+            .tickFormat(d3.timeFormat("%m-%Y")));
+      
+        // Add Y axis
+        y = d3.scaleLinear()
+          .domain([0, filteredVarMax])
+          .range([ height, 0 ]);
+        svg.append("g")
+          .transition()
+          .call(d3.axisLeft(y));  
+          // Define the color scale
+      
+ 
+      if (changingXDomain == true){
+        // Update areas with filtered and stacked data
+        svg.selectAll(".area")
+            .data(filteredStackedData.reverse())
+            .transition() // Apply transition to smoothly update the areas
+            .duration(100) // Set the duration of the transition
+            .attr("d", d3.area()
+                .x(function(d) { return x(new Date(d.data.key)); })
+                .y0(function(d) { return y(d[0]); })
+                .y1(function(d) { return y(d[1]); })
+            )
+            .style("fill", function(d) {  
+              columnSelected = getRadioButtonColor();
+              if (columnSelected == "PercentChange") {
+                  var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
+                  return colorScale(percentDiff);
+              } else {
+                  return color(etfs[d.key]);
+              }
+          })
+          .style("opacity", function(d) {
+              var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
+              // Adjust opacity based on the percent difference
+              return Math.abs(percentDiff) / 2 + 0.5; // Opacity ranges from 0.5 to 1
+          });
+      }
+      else{
+        // Update areas with filtered and stacked data
+        svg.selectAll(".area")
+          .transition()
+          .style("opacity", 0)
+          .remove();
+        
+        showAreas(filteredStackedData, y, x)
+      }
+
+      
+
+      // Update legend with filtered data
+      addLegends(filteredStackedData);
+    }
+
+    //-------------------------------------------------------------------------------------------------\
+    //Slider CODE
+    //------------------------------------------------------------------------------------------------\
+
+      // Define the slider
+    const sliderRange = d3
+      .sliderBottom()
+      .min(d3.min(data, d => d.Date))
+      .max(d3.max(data, d => d.Date))
+      .width(110)
+      .tickFormat(d3.timeFormat('%Y-%m'))
+      .ticks(0)
+      .default([d3.min(data, d => d.Date), d3.max(data, d => d.Date)])
+      .fill('#85bb65');
+
+
+    sliderRange.on('onchange', val => {
+      defaultRange = val
+      updateVisualization(val, true)
+    });
+
+    // Add the slider to the DOM
+    const gRange = d3
+      .select('#slider-range')
+      .append('svg')
+      .append('g')
+      .attr('transform', 'translate(20,10)');
+
+    gRange.call(sliderRange);
+    
+
+
+    //------------------------------------------------------------------------------------------------------
+
+    // Example usage: call updateType function whenever a type radio button changes
+    d3.selectAll(".type-filter-radio").on("change", function() {
+      updateVisualization(defaultRange, true);
+    });
+
+    d3.selectAll(".color-type-filter-radio").on("change", function() {
+      updateVisualization(defaultRange, true);
+    });
+          // Select the container where checkboxes will be appended
+    var checkboxContainer = d3.select("#checkboxContainer");
+
+    // Append a checkbox for each unique stock type
+    var checkboxes = checkboxContainer.selectAll("input")
+        .data(uniqueStockTypes)
+        .enter()
+        .append("div") // Wrap each checkbox and label in a div
+        .each(function(d) { // For each div, append the input and label
+            var checkbox = d3.select(this)
+                .append("input")
+                .attr("type", "checkbox")
+                .attr("id", function(d) { return "stock-filter-" + d; })
+                .attr("class", "stock-filter-checkbox")
+                .attr("value", function(d) { return d; })
+                .attr("checked", true);
+
+            // Add change event listener with a parameter
+            checkbox.on("change", function() {
+                updateVisualization(defaultRange, false); // Call updateVisualization with the parameter 'd'
+            });
+
+            d3.select(this)
+                .append("label")
+                .attr("for", function(d) { return "stock-filter-" + d; })
+                .text(function(d) { return d; });
+        });
+
+      })
+
+      document.addEventListener("click", function(event) {
+      if (!event.target.closest(".g") && !event.target.closest(".area")){
+        if (isHighlighted) {
+          // Remove highlight from all areas
+          d3.selectAll(".area").style("opacity", 1);
+          d3.selectAll(".legend-item").style("opacity", 1);
+          // Update isHighlighted flag
+          isHighlighted = false;
+          popup.style.display = "none";
+        }
+          setTimeout(function() {
+          popup.style.display = "none";
+        }, 100); // Adjust the delay time as needed
+      }
+    });
+  </script>
