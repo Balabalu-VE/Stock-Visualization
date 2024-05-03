@@ -52,7 +52,7 @@
         <div id="slider-range"></div>
       </div>
 
-        <button class="button" id="shareButton" > Share</button >
+        <button class="button" id="shareButton" onclick="printPage()"> Share Graph</button >
         <!-- Add a div for the slider -->
         
     </div>
@@ -60,6 +60,17 @@
 </div>
 
 <style>
+    @media print {
+      body {
+        visibility: hidden;
+      }
+      #my_dataviz {
+        visibility: visible;
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+    }
     .popup {
         position: absolute;
         background-color: white;
@@ -115,9 +126,8 @@
     }
     .button{
         height:30px;
-        width:60px;
-        position: absolute;
-        bottom: 0;
+        width:174px;
+        margin-left: 10px;
 }
 </style>
 
@@ -733,4 +743,7 @@ var colorScale = d3.scaleLinear()
         }, 100); // Adjust the delay time as needed
       }
     });
+    function printPage() {
+      window.print();
+    }
   </script>
