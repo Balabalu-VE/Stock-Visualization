@@ -634,11 +634,6 @@ var colorScale = d3.scaleLinear()
                   return color(etfs[d.key]);
               }
           })
-          .style("opacity", function(d) {
-              var percentDiff = parseFloat((d[d.length - 1].data.values[d.key].percent - 100 / totalNumberOfStocks)/6);
-              // Adjust opacity based on the percent difference
-              return Math.abs(percentDiff) / 2 + 0.5; // Opacity ranges from 0.5 to 1
-          });
       }
       else{
         // Update areas with filtered and stacked data
